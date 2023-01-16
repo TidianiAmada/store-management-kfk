@@ -1,9 +1,10 @@
 package com.sts.internals.messaging.endpoints;
 
 import com.sts.internals.messaging.services.ProductService;
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StoreQueryParameters;
+import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
 import org.springframework.kafka.config.StreamsBuilderFactoryBean;
@@ -13,11 +14,18 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequiredArgsConstructor
+@Slf4j
 public class ProductStoreGateway {
 
-    private final StreamsBuilderFactoryBean factoryBean;
     private final ProductService service;
+
+    private final StreamsBuilderFactoryBean factoryBean;
+
+    public ProductStoreGateway(ProductService service, StreamsBuilderFactoryBean factoryBean) {
+        this.service = service;
+        this.factoryBean = factoryBean;
+
+    }
 
 
     @PostMapping("/message")
@@ -25,13 +33,14 @@ public class ProductStoreGateway {
         service.sendMessage(message);
     }
 
-    @GetMapping
-    public Long getQuantityOnStore(){
-        KafkaStreams kafkaStreams= factoryBean.getKafkaStreams();
+    @GetMapping("/reception")
+    public KeyValueIterator<String, Long> getQuantityOnStore() throws InterruptedException {
 
+        KafkaStreams kafkaStreams=factoryBean.getKafkaStreams();
         ReadOnlyKeyValueStore<String, Long> counts = kafkaStreams
-                .store(StoreQueryParameters.fromNameAndType("counts", QueryableStoreTypes.keyValueStore()));
-        return counts.approximateNumEntries();
+                .store(StoreQueryParameters.fromNameAndType("stores", QueryableStoreTypes.keyValueStore()));
+        //kafkaStreams.close();
+        return counts.all();
     }
 
 
